@@ -1,3 +1,11 @@
 export { default as add } from "./add";
 export { default as greet } from "./greet";
 export { default as reverseText } from "./reverse_text";
+export { default as puppeteerConnectActiveTab } from "./puppeteer_connect_active_tab";
+export { default as puppeteerNavigate } from "./puppeteer_navigate";
+export { default as puppeteerScreenshot } from "./puppeteer_screenshot";
+export { default as puppeteerClick } from "./puppeteer_click";
+export { default as puppeteerFill } from "./puppeteer_fill";
+export { default as puppeteerSelect } from "./puppeteer_select";
+export { default as puppeteerHover } from "./puppeteer_hover";
+export { default as puppeteerEvaluate } from "./puppeteer_evaluate";

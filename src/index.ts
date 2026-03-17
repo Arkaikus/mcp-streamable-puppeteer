@@ -2,7 +2,7 @@ import { Hono } from "hono";
 import { streamSSE } from "hono/streaming";
 import { StreamableHTTPTransport } from "@hono/mcp";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { add, greet, reverseText } from "./tools/index";
+import { add, greet, reverseText, puppeteerConnectActiveTab, puppeteerNavigate, puppeteerScreenshot, puppeteerClick, puppeteerFill, puppeteerSelect, puppeteerHover, puppeteerEvaluate } from "./tools/index";
 
 const app = new Hono();
 
@@ -14,6 +14,14 @@ function createMcpServer() {
   add(server);
   greet(server);
   reverseText(server);
+  puppeteerConnectActiveTab(server);
+  puppeteerNavigate(server);
+  puppeteerScreenshot(server);
+  puppeteerClick(server);
+  puppeteerFill(server);
+  puppeteerSelect(server);
+  puppeteerHover(server);
+  puppeteerEvaluate(server);
   return server;
 }
 
