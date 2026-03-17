@@ -7,7 +7,7 @@ export default (server: McpServer) => {
     "puppeteer_connect_active_tab",
     {
       description:
-        "Connect to the Brave browser running in the docker-brave container. " +
+        "Connect to the browser (headless-shell or any CDP-compatible browser). " +
         "Returns a sessionId and the list of open tabs with their tabIds. " +
         "Use the sessionId and tabId with all other puppeteer tools.",
       inputSchema: z.object({
@@ -70,7 +70,7 @@ export default (server: McpServer) => {
           content: [
             {
               type: "text" as const,
-              text: `Failed to connect to browser: ${message}\n\nEnsure the docker-brave container is running with remote debugging enabled:\n  BRAVE_CLI=--remote-debugging-port=9222 --remote-debugging-address=0.0.0.0`,
+              text: `Failed to connect to browser: ${message}\n\nEnsure the browser container (headless-shell or brave) is running with remote debugging on port 9222.`,
             },
           ],
           isError: true,

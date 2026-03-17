@@ -15,15 +15,45 @@ function generateId(): string {
 async function ensureBrowserConnection(
   host: string,
   port: number,
+  maxRetries = 5,
+  initialDelayMs = 1000,
 ): Promise<Browser> {
-  const res = await fetch(`http://${host}:${port}/json/version`);
-  if (!res.ok) {
-    throw new Error(
-      `Failed to reach browser debugger at ${host}:${port}: ${res.status} ${res.statusText}`,
-    );
+  let lastError: Error | undefined;
+
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
+    try {
+      const res = await fetch(`http://${host}:${port}/json/version`);
+      if (!res.ok) {
+        throw new Error(
+          `Failed to reach browser debugger at ${host}:${port}: ${res.status} ${res.statusText}`,
+        );
+      }
+      const data = (await res.json()) as { webSocketDebuggerUrl: string };
+      // Use same host for WebSocket to avoid IPv6 vs IPv4 resolution mismatch:
+      // Chrome may return ws://localhost:9222/... but Node/Bun can resolve
+      // localhost to ::1 while Chrome listens on 127.0.0.1, causing connection failure.
+      const effectiveHost = host === "localhost" ? "127.0.0.1" : host;
+      const wsUrl = new URL(data.webSocketDebuggerUrl);
+      wsUrl.hostname = effectiveHost;
+      return puppeteer.connect({
+        browserWSEndpoint: wsUrl.toString(),
+      });
+    } catch (error) {
+      lastError = error instanceof Error ? error : new Error(String(error));
+
+      if (attempt < maxRetries - 1) {
+        const delayMs = initialDelayMs * 2 ** attempt;
+        console.warn(
+          `Browser connection attempt ${attempt + 1}/${maxRetries} failed: ${lastError.message}. Retrying in ${delayMs}ms...`,
+        );
+        await new Promise((resolve) => setTimeout(resolve, delayMs));
+      }
+    }
   }
-  const data = (await res.json()) as { webSocketDebuggerUrl: string };
-  return puppeteer.connect({ browserWSEndpoint: data.webSocketDebuggerUrl });
+
+  throw new Error(
+    `Failed to connect to browser at ${host}:${port} after ${maxRetries} attempts. Last error: ${lastError?.message}`,
+  );
 }
 
 /**

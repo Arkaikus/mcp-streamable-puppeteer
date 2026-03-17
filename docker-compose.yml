@@ -2,30 +2,42 @@ services:
   brave:
     image: lscr.io/linuxserver/brave:latest
     container_name: brave
+    profiles:
+      - brave
     environment:
       - PUID=1000
       - PGID=1000
       - TZ=Etc/UTC
-      - BRAVE_CLI=--remote-debugging-port=9222 --remote-debugging-address=0.0.0.0
+      - BRAVE_CLI=--headless --remote-debugging-port=9222 --remote-debugging-address=0.0.0.0
     ports:
       - "3001:3001"
-      - "9222:9222"
+      # - "9222:9222"
     volumes:
       - brave-config:/config
     security_opt:
       - seccomp:unconfined
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9222/json/version"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
   mcp-streamable-puppeteer:
     build: .
     container_name: mcp-streamable-puppeteer
     ports:
       - "8000:8000"
     environment:
-      - BROWSER_DEBUG_HOST=brave
+      - BROWSER_DEBUG_HOST=localhost
       - BROWSER_DEBUG_PORT=9222
-    depends_on:
-      - brave
     restart: unless-stopped
+  headless-shell:
+    image: chromedp/headless-shell:latest
+    container_name: headless-shell
+    shm_size: "2g"
+    restart: unless-stopped
+    network_mode: service:mcp-streamable-puppeteer
 
 volumes:
   brave-config:
