@@ -1,7 +1,31 @@
 services:
+  brave:
+    image: lscr.io/linuxserver/brave:latest
+    container_name: brave
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=Etc/UTC
+      - BRAVE_CLI=--remote-debugging-port=9222 --remote-debugging-address=0.0.0.0
+    ports:
+      - "3001:3001"
+      - "9222:9222"
+    volumes:
+      - brave-config:/config
+    security_opt:
+      - seccomp:unconfined
+    restart: unless-stopped
   mcp-streamable-js:
     build: .
     container_name: mcp-streamable-js
     ports:
       - "8000:8000"
+    environment:
+      - BROWSER_DEBUG_HOST=brave
+      - BROWSER_DEBUG_PORT=9222
+    depends_on:
+      - brave
     restart: unless-stopped
+
+volumes:
+  brave-config:
