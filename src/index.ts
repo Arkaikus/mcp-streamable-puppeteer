@@ -6,6 +6,7 @@ import {
   puppeteerConnectActiveTab,
   puppeteerOpenTab,
   puppeteerCloseTab,
+  puppeteerGetContent,
   puppeteerNavigate,
   puppeteerScreenshot,
   puppeteerClick,
@@ -25,6 +26,7 @@ function createMcpServer() {
   puppeteerConnectActiveTab(server);
   puppeteerOpenTab(server);
   puppeteerCloseTab(server);
+  puppeteerGetContent(server);
   puppeteerNavigate(server);
   puppeteerScreenshot(server);
   puppeteerClick(server);
