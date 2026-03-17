@@ -6,19 +6,56 @@ export default (server: McpServer) => {
   server.registerTool(
     "puppeteer_fill",
     {
-      description: "Fill an input field with a value in a specific browser tab",
+      description:
+        "Fill an input field with a value in a specific browser tab. " +
+        "Use fast=true for direct value assignment (faster, fewer events); default types character-by-character (realistic).",
       inputSchema: z.object({
-        sessionId: z.string().describe("Session identifier returned by puppeteer_connect_active_tab"),
-        tabId: z.string().describe("Tab identifier returned by puppeteer_connect_active_tab or puppeteer_open_tab"),
+        sessionId: z
+          .string()
+          .describe(
+            "Session identifier returned by puppeteer_connect_active_tab",
+          ),
+        tabId: z
+          .string()
+          .describe(
+            "Tab identifier returned by puppeteer_connect_active_tab or puppeteer_open_tab",
+          ),
         selector: z.string().describe("CSS selector of the input element"),
         value: z.string().describe("Value to type into the element"),
+        fast: z
+          .boolean()
+          .optional()
+          .describe(
+            "If true, set value directly via evaluate (faster). If false/omitted, type character-by-character.",
+          ),
+        timeout: z
+          .number()
+          .optional()
+          .describe("Wait for selector timeout in ms (default: 30000)"),
       }),
     },
-    async ({ sessionId, tabId, selector, value }) => {
+    async ({ sessionId, tabId, selector, value, fast, timeout }) => {
       try {
         const page = await getPage(sessionId, tabId);
-        await page.waitForSelector(selector);
-        await page.type(selector, value);
+        await page.waitForSelector(selector, { timeout: timeout ?? 30000 });
+        if (fast) {
+          await page.evaluate(
+            (sel, val) => {
+              const el = document.querySelector(sel) as
+                | HTMLInputElement
+                | HTMLTextAreaElement
+                | null;
+              if (!el) throw new Error(`Element not found: ${sel}`);
+              el.value = val;
+              el.dispatchEvent(new Event("input", { bubbles: true }));
+              el.dispatchEvent(new Event("change", { bubbles: true }));
+            },
+            selector,
+            value,
+          );
+        } else {
+          await page.type(selector, value);
+        }
         return {
           content: [
             {
@@ -39,6 +76,6 @@ export default (server: McpServer) => {
           isError: true,
         };
       }
-    }
+    },
   );
 };

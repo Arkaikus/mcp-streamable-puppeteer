@@ -8,8 +8,16 @@ export default (server: McpServer) => {
     {
       description: "Close a specific browser tab in the given session.",
       inputSchema: z.object({
-        sessionId: z.string().describe("Session identifier returned by puppeteer_connect_active_tab"),
-        tabId: z.string().describe("Tab identifier returned by puppeteer_connect_active_tab or puppeteer_open_tab"),
+        sessionId: z
+          .string()
+          .describe(
+            "Session identifier returned by puppeteer_connect_active_tab",
+          ),
+        tabId: z
+          .string()
+          .describe(
+            "Tab identifier returned by puppeteer_connect_active_tab or puppeteer_open_tab",
+          ),
       }),
     },
     async ({ sessionId, tabId }) => {
@@ -35,6 +43,6 @@ export default (server: McpServer) => {
           isError: true,
         };
       }
-    }
+    },
   );
 };

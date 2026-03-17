@@ -8,15 +8,27 @@ export default (server: McpServer) => {
     {
       description: "Click on an element in a specific browser tab",
       inputSchema: z.object({
-        sessionId: z.string().describe("Session identifier returned by puppeteer_connect_active_tab"),
-        tabId: z.string().describe("Tab identifier returned by puppeteer_connect_active_tab or puppeteer_open_tab"),
+        sessionId: z
+          .string()
+          .describe(
+            "Session identifier returned by puppeteer_connect_active_tab",
+          ),
+        tabId: z
+          .string()
+          .describe(
+            "Tab identifier returned by puppeteer_connect_active_tab or puppeteer_open_tab",
+          ),
         selector: z.string().describe("CSS selector of the element to click"),
+        timeout: z
+          .number()
+          .optional()
+          .describe("Wait for selector timeout in ms (default: 30000)"),
       }),
     },
-    async ({ sessionId, tabId, selector }) => {
+    async ({ sessionId, tabId, selector, timeout }) => {
       try {
         const page = await getPage(sessionId, tabId);
-        await page.waitForSelector(selector);
+        await page.waitForSelector(selector, { timeout: timeout ?? 30000 });
         await page.click(selector);
         return {
           content: [
@@ -38,6 +50,6 @@ export default (server: McpServer) => {
           isError: true,
         };
       }
-    }
+    },
   );
 };

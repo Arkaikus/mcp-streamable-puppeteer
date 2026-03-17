@@ -10,16 +10,24 @@ export default (server: McpServer) => {
         "Open a new browser tab in the given session. " +
         "Optionally navigates to a URL immediately. Returns the new tabId.",
       inputSchema: z.object({
-        sessionId: z.string().describe("Session identifier returned by puppeteer_connect_active_tab"),
+        sessionId: z
+          .string()
+          .describe(
+            "Session identifier returned by puppeteer_connect_active_tab",
+          ),
         url: z
           .string()
           .optional()
           .describe("URL to navigate to after opening the tab (optional)"),
+        timeout: z
+          .number()
+          .optional()
+          .describe("Navigation timeout in ms (default: 30000)"),
       }),
     },
-    async ({ sessionId, url }) => {
+    async ({ sessionId, url, timeout }) => {
       try {
-        const { tabId, url: finalUrl } = await openTab(sessionId, url);
+        const { tabId, url: finalUrl } = await openTab(sessionId, url, timeout);
         return {
           content: [
             {
@@ -40,6 +48,6 @@ export default (server: McpServer) => {
           isError: true,
         };
       }
-    }
+    },
   );
 };

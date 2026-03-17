@@ -6,19 +6,39 @@ export default (server: McpServer) => {
   server.registerTool(
     "puppeteer_navigate",
     {
-      description: "Navigate a specific browser tab to a URL",
+      description:
+        "Navigate a specific browser tab to a URL. " +
+        "Set failOn4xx=false to allow 4xx responses (e.g. SPAs that serve 404 for client routes).",
       inputSchema: z.object({
-        sessionId: z.string().describe("Session identifier returned by puppeteer_connect_active_tab"),
-        tabId: z.string().describe("Tab identifier returned by puppeteer_connect_active_tab or puppeteer_open_tab"),
+        sessionId: z
+          .string()
+          .describe(
+            "Session identifier returned by puppeteer_connect_active_tab",
+          ),
+        tabId: z
+          .string()
+          .describe(
+            "Tab identifier returned by puppeteer_connect_active_tab or puppeteer_open_tab",
+          ),
         url: z.string().describe("URL to navigate to"),
+        timeout: z
+          .number()
+          .optional()
+          .describe("Navigation timeout in ms (default: 30000)"),
+        failOn4xx: z
+          .boolean()
+          .optional()
+          .describe(
+            "If true (default), throw on HTTP 4xx. If false, allow 4xx (e.g. SPA 404).",
+          ),
       }),
     },
-    async ({ sessionId, tabId, url }) => {
+    async ({ sessionId, tabId, url, timeout, failOn4xx = true }) => {
       try {
         const page = await getPage(sessionId, tabId);
         const response = await page.goto(url, {
           waitUntil: "networkidle0",
-          timeout: 30000,
+          timeout: timeout ?? 30000,
         });
 
         if (!response) {
@@ -26,7 +46,7 @@ export default (server: McpServer) => {
         }
 
         const status = response.status();
-        if (status >= 400) {
+        if (failOn4xx && status >= 400) {
           throw new Error(`HTTP error: ${status} ${response.statusText()}`);
         }
 
@@ -50,6 +70,6 @@ export default (server: McpServer) => {
           isError: true,
         };
       }
-    }
+    },
   );
 };

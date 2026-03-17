@@ -12,17 +12,19 @@ export default (server: McpServer) => {
       inputSchema: z.object({
         sessionId: z
           .string()
-          .describe("Session identifier returned by puppeteer_connect_active_tab"),
+          .describe(
+            "Session identifier returned by puppeteer_connect_active_tab",
+          ),
         tabId: z
           .string()
           .describe(
-            "Tab identifier returned by puppeteer_connect_active_tab or puppeteer_open_tab"
+            "Tab identifier returned by puppeteer_connect_active_tab or puppeteer_open_tab",
           ),
         selector: z
           .string()
           .optional()
           .describe(
-            "CSS selector whose outer HTML to return (default: full page HTML)"
+            "CSS selector whose outer HTML to return (default: full page HTML)",
           ),
       }),
     },
@@ -34,17 +36,7 @@ export default (server: McpServer) => {
 
         if (selector) {
           const element = await page.waitForSelector(selector);
-          if (!element) {
-            return {
-              content: [
-                {
-                  type: "text" as const,
-                  text: `Element not found: ${selector}`,
-                },
-              ],
-              isError: true,
-            };
-          }
+          if (!element) throw new Error(`Element not found: ${selector}`);
           html = await page.evaluate((el) => el.outerHTML, element);
         } else {
           html = await page.content();
@@ -70,6 +62,6 @@ export default (server: McpServer) => {
           isError: true,
         };
       }
-    }
+    },
   );
 };

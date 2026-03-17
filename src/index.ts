@@ -1,19 +1,19 @@
-import { Hono } from "hono";
-import { streamSSE } from "hono/streaming";
 import { StreamableHTTPTransport } from "@hono/mcp";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { Hono } from "hono";
+import { streamSSE } from "hono/streaming";
 import {
-  puppeteerConnectActiveTab,
-  puppeteerOpenTab,
-  puppeteerCloseTab,
-  puppeteerGetContent,
-  puppeteerNavigate,
-  puppeteerScreenshot,
   puppeteerClick,
-  puppeteerFill,
-  puppeteerSelect,
-  puppeteerHover,
+  puppeteerCloseTab,
+  puppeteerConnectActiveTab,
   puppeteerEvaluate,
+  puppeteerFill,
+  puppeteerGetContent,
+  puppeteerHover,
+  puppeteerNavigate,
+  puppeteerOpenTab,
+  puppeteerScreenshot,
+  puppeteerSelect,
 } from "./tools/index";
 
 const app = new Hono();
@@ -46,11 +46,11 @@ app.get("/mcp", (c) =>
   streamSSE(c, async (stream) => {
     const keepAlive = setInterval(
       () => stream.writeSSE({ data: "", event: "ping" }),
-      30_000
+      30_000,
     );
     stream.onAbort(() => clearInterval(keepAlive));
     await new Promise<never>(() => {}); // keep stream open
-  })
+  }),
 );
 
 app.post("/mcp", async (c) => {

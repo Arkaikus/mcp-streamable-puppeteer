@@ -16,20 +16,27 @@ export default (server: McpServer) => {
           .optional()
           .describe(
             "Session identifier (reuses an existing connection when provided). " +
-            "If omitted a new UUID is generated."
+              "If omitted a new UUID is generated.",
           ),
         debugHost: z
           .string()
           .optional()
-          .describe("Remote debugging host (default: BROWSER_DEBUG_HOST env or localhost)"),
+          .describe(
+            "Remote debugging host (default: BROWSER_DEBUG_HOST env or localhost)",
+          ),
         debugPort: z
           .number()
           .optional()
-          .describe("Remote debugging port (default: BROWSER_DEBUG_PORT env or 9222)"),
+          .describe(
+            "Remote debugging port (default: BROWSER_DEBUG_PORT env or 9222)",
+          ),
         targetUrl: z
           .string()
           .optional()
-          .describe("Filter: only return tabs whose URL contains this string"),
+          .describe(
+            "Filter: only show tabs whose URL contains this string in the output. " +
+              "The session still tracks all tabs; this only filters the displayed list.",
+          ),
       }),
     },
     async ({ sessionId, debugHost, debugPort, targetUrl }) => {
@@ -39,7 +46,9 @@ export default (server: McpServer) => {
         const port = debugPort ?? Number(Bun.env.BROWSER_DEBUG_PORT ?? 9222);
 
         const { tabs } = await connectSession(sid, host, port);
-        const filtered = targetUrl ? tabs.filter((t) => t.url.includes(targetUrl)) : tabs;
+        const filtered = targetUrl
+          ? tabs.filter((t) => t.url.includes(targetUrl))
+          : tabs;
 
         const tabLines = filtered
           .map((t) => `  • tabId=${t.tabId}  ${t.title} (${t.url})`)
@@ -61,15 +70,12 @@ export default (server: McpServer) => {
           content: [
             {
               type: "text" as const,
-              text:
-                `Failed to connect to browser: ${message}\n\n` +
-                "Ensure the docker-brave container is running with remote debugging enabled:\n" +
-                "  BRAVE_CLI=--remote-debugging-port=9222 --remote-debugging-address=0.0.0.0",
+              text: `Failed to connect to browser: ${message}\n\nEnsure the docker-brave container is running with remote debugging enabled:\n  BRAVE_CLI=--remote-debugging-port=9222 --remote-debugging-address=0.0.0.0`,
             },
           ],
           isError: true,
         };
       }
-    }
+    },
   );
 };

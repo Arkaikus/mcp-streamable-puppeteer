@@ -12,11 +12,14 @@ function generateId(): string {
   return crypto.randomUUID();
 }
 
-async function ensureBrowserConnection(host: string, port: number): Promise<Browser> {
+async function ensureBrowserConnection(
+  host: string,
+  port: number,
+): Promise<Browser> {
   const res = await fetch(`http://${host}:${port}/json/version`);
   if (!res.ok) {
     throw new Error(
-      `Failed to reach browser debugger at ${host}:${port}: ${res.status} ${res.statusText}`
+      `Failed to reach browser debugger at ${host}:${port}: ${res.status} ${res.statusText}`,
     );
   }
   const data = (await res.json()) as { webSocketDebuggerUrl: string };
@@ -31,8 +34,11 @@ async function ensureBrowserConnection(host: string, port: number): Promise<Brow
 export async function connectSession(
   sessionId: string,
   host: string = Bun.env.BROWSER_DEBUG_HOST ?? "localhost",
-  port: number = Number(Bun.env.BROWSER_DEBUG_PORT ?? 9222)
-): Promise<{ sessionId: string; tabs: { tabId: string; url: string; title: string }[] }> {
+  port: number = Number(Bun.env.BROWSER_DEBUG_PORT ?? 9222),
+): Promise<{
+  sessionId: string;
+  tabs: { tabId: string; url: string; title: string }[];
+}> {
   const existing = sessions.get(sessionId);
   if (existing?.browser.connected) {
     const tabs = await buildTabList(existing);
@@ -58,7 +64,7 @@ export async function connectSession(
 }
 
 async function buildTabList(
-  session: Session
+  session: Session,
 ): Promise<{ tabId: string; url: string; title: string }[]> {
   const result: { tabId: string; url: string; title: string }[] = [];
   for (const [tabId, page] of session.tabs) {
@@ -74,7 +80,9 @@ async function buildTabList(
 export async function getPage(sessionId: string, tabId: string): Promise<Page> {
   const session = sessions.get(sessionId);
   if (!session) {
-    throw new Error(`Session '${sessionId}' not found. Call puppeteer_connect_active_tab first.`);
+    throw new Error(
+      `Session '${sessionId}' not found. Call puppeteer_connect_active_tab first.`,
+    );
   }
   const page = session.tabs.get(tabId);
   if (!page || page.isClosed()) {
@@ -89,11 +97,14 @@ export async function getPage(sessionId: string, tabId: string): Promise<Page> {
  */
 export async function openTab(
   sessionId: string,
-  url?: string
+  url?: string,
+  timeout = 30000,
 ): Promise<{ tabId: string; url: string }> {
   const session = sessions.get(sessionId);
   if (!session) {
-    throw new Error(`Session '${sessionId}' not found. Call puppeteer_connect_active_tab first.`);
+    throw new Error(
+      `Session '${sessionId}' not found. Call puppeteer_connect_active_tab first.`,
+    );
   }
   const page = await session.browser.newPage();
   const tabId = generateId();
@@ -101,14 +112,17 @@ export async function openTab(
   page.on("close", () => session.tabs.delete(tabId));
 
   if (url) {
-    await page.goto(url, { waitUntil: "networkidle0", timeout: 30000 });
+    await page.goto(url, { waitUntil: "networkidle0", timeout });
   }
 
   return { tabId, url: page.url() };
 }
 
 /** Close a specific tab. */
-export async function closeTab(sessionId: string, tabId: string): Promise<void> {
+export async function closeTab(
+  sessionId: string,
+  tabId: string,
+): Promise<void> {
   const session = sessions.get(sessionId);
   if (!session) {
     throw new Error(`Session '${sessionId}' not found.`);

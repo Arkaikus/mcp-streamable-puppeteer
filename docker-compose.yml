@@ -15,9 +15,9 @@ services:
     security_opt:
       - seccomp:unconfined
     restart: unless-stopped
-  mcp-streamable-js:
+  mcp-streamable-puppeteer:
     build: .
-    container_name: mcp-streamable-js
+    container_name: mcp-streamable-puppeteer
     ports:
       - "8000:8000"
     environment:
