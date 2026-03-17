@@ -1,0 +1,7 @@
+services:
+  mcp-streamable-js:
+    build: .
+    container_name: mcp-streamable-js
+    ports:
+      - "8000:8000"
+    restart: unless-stopped
