@@ -1,19 +1,21 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { ensureBrowser } from "../browser";
+import { getPage } from "../session";
 
 export default (server: McpServer) => {
   server.registerTool(
     "puppeteer_navigate",
     {
-      description: "Navigate the browser to a URL",
+      description: "Navigate a specific browser tab to a URL",
       inputSchema: z.object({
+        sessionId: z.string().describe("Session identifier returned by puppeteer_connect_active_tab"),
+        tabId: z.string().describe("Tab identifier returned by puppeteer_connect_active_tab or puppeteer_open_tab"),
         url: z.string().describe("URL to navigate to"),
       }),
     },
-    async ({ url }) => {
+    async ({ sessionId, tabId, url }) => {
       try {
-        const page = await ensureBrowser();
+        const page = await getPage(sessionId, tabId);
         const response = await page.goto(url, {
           waitUntil: "networkidle0",
           timeout: 30000,

@@ -1,13 +1,15 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { ensureBrowser } from "../browser";
+import { getPage } from "../session";
 
 export default (server: McpServer) => {
   server.registerTool(
     "puppeteer_screenshot",
     {
-      description: "Take a screenshot of the current page or a specific element",
+      description: "Take a screenshot of a specific browser tab or one of its elements",
       inputSchema: z.object({
+        sessionId: z.string().describe("Session identifier returned by puppeteer_connect_active_tab"),
+        tabId: z.string().describe("Tab identifier returned by puppeteer_connect_active_tab or puppeteer_open_tab"),
         name: z.string().describe("Name for the screenshot"),
         selector: z
           .string()
@@ -17,9 +19,9 @@ export default (server: McpServer) => {
         height: z.number().optional().describe("Viewport height in pixels (default: 600)"),
       }),
     },
-    async ({ name, selector, width, height }) => {
+    async ({ sessionId, tabId, name, selector, width, height }) => {
       try {
-        const page = await ensureBrowser();
+        const page = await getPage(sessionId, tabId);
         const vw = width ?? 800;
         const vh = height ?? 600;
         await page.setViewport({ width: vw, height: vh });

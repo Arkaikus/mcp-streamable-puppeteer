@@ -1,28 +1,30 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { getPage } from "../session";
+import { openTab } from "../session";
 
 export default (server: McpServer) => {
   server.registerTool(
-    "puppeteer_hover",
+    "puppeteer_open_tab",
     {
-      description: "Hover the mouse over an element in a specific browser tab",
+      description:
+        "Open a new browser tab in the given session. " +
+        "Optionally navigates to a URL immediately. Returns the new tabId.",
       inputSchema: z.object({
         sessionId: z.string().describe("Session identifier returned by puppeteer_connect_active_tab"),
-        tabId: z.string().describe("Tab identifier returned by puppeteer_connect_active_tab or puppeteer_open_tab"),
-        selector: z.string().describe("CSS selector of the element to hover over"),
+        url: z
+          .string()
+          .optional()
+          .describe("URL to navigate to after opening the tab (optional)"),
       }),
     },
-    async ({ sessionId, tabId, selector }) => {
+    async ({ sessionId, url }) => {
       try {
-        const page = await getPage(sessionId, tabId);
-        await page.waitForSelector(selector);
-        await page.hover(selector);
+        const { tabId, url: finalUrl } = await openTab(sessionId, url);
         return {
           content: [
             {
               type: "text" as const,
-              text: `Hovered ${selector}`,
+              text: `Opened new tab. tabId=${tabId}  url=${finalUrl}`,
             },
           ],
         };
@@ -32,7 +34,7 @@ export default (server: McpServer) => {
           content: [
             {
               type: "text" as const,
-              text: `Failed to hover ${selector}: ${message}`,
+              text: `Failed to open tab: ${message}`,
             },
           ],
           isError: true,

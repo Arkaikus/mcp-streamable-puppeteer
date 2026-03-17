@@ -1,20 +1,23 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import type { ConsoleMessage } from "puppeteer-core";
-import { ensureBrowser } from "../browser";
+import { getPage } from "../session";
 
 export default (server: McpServer) => {
   server.registerTool(
     "puppeteer_evaluate",
     {
-      description: "Execute JavaScript in the browser context and return the result",
+      description:
+        "Execute JavaScript in the context of a specific browser tab and return the result",
       inputSchema: z.object({
-        script: z.string().describe("JavaScript code to execute in the browser"),
+        sessionId: z.string().describe("Session identifier returned by puppeteer_connect_active_tab"),
+        tabId: z.string().describe("Tab identifier returned by puppeteer_connect_active_tab or puppeteer_open_tab"),
+        script: z.string().describe("JavaScript code to execute in the browser tab"),
       }),
     },
-    async ({ script }) => {
+    async ({ sessionId, tabId, script }) => {
       try {
-        const page = await ensureBrowser();
+        const page = await getPage(sessionId, tabId);
 
         const logs: string[] = [];
         const consoleListener = (message: ConsoleMessage) => {
