@@ -1,26 +1,28 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { getPage } from "../session";
+import { connectSession, getPage, openTab } from "../session";
 
 export default (server: McpServer) => {
   server.registerTool(
     "puppeteer_navigate",
     {
       description:
-        "Navigate a specific browser tab to a URL. " +
-        "Set failOn4xx=false to allow 4xx responses (e.g. SPAs that serve 404 for client routes).",
+        "Main entrypoint: navigate to a URL. When sessionId and tabId are omitted, creates a new session and tab, then navigates. " +
+        "When provided, navigates the existing tab. Set failOn4xx=false to allow 4xx responses (e.g. SPAs that serve 404 for client routes).",
       inputSchema: z.object({
+        url: z.string().describe("URL to navigate to"),
         sessionId: z
           .string()
+          .optional()
           .describe(
-            "Session identifier returned by puppeteer_connect_active_tab",
+            "Session identifier (omit to create new session + tab as main entrypoint)",
           ),
         tabId: z
           .string()
+          .optional()
           .describe(
-            "Tab identifier returned by puppeteer_connect_active_tab or puppeteer_open_tab",
+            "Tab identifier (omit with sessionId to create new tab; omit both to start fresh)",
           ),
-        url: z.string().describe("URL to navigate to"),
         timeout: z
           .number()
           .optional()
@@ -33,28 +35,65 @@ export default (server: McpServer) => {
           ),
       }),
     },
-    async ({ sessionId, tabId, url, timeout, failOn4xx = true }) => {
+    async ({ url, sessionId, tabId, timeout, failOn4xx = true }) => {
       try {
-        const page = await getPage(sessionId, tabId);
-        const response = await page.goto(url, {
-          waitUntil: "networkidle0",
-          timeout: timeout ?? 30000,
-        });
+        const navTimeout = timeout ?? 30000;
+        let sid = sessionId;
+        let tid = tabId;
+        let isNewSession = false;
 
-        if (!response) {
-          throw new Error("Navigation failed - no response received");
+        if (!sid) {
+          sid = crypto.randomUUID();
+          await connectSession(sid);
+          const { tabId: newTabId } = await openTab(sid, url, navTimeout);
+          tid = newTabId;
+          isNewSession = true;
+        } else if (!tid) {
+          const { tabId: newTabId } = await openTab(sid, url, navTimeout);
+          tid = newTabId;
+        } else {
+          const page = await getPage(sid, tid);
+          const response = await page.goto(url, {
+            waitUntil: "networkidle0",
+            timeout: navTimeout,
+          });
+          if (!response) throw new Error("Navigation failed - no response received");
+          const status = response.status();
+          if (failOn4xx && status >= 400) {
+            throw new Error(`HTTP error: ${status} ${response.statusText()}`);
+          }
+          return {
+            content: [
+              {
+                type: "text" as const,
+                text: JSON.stringify({
+                  status: "success",
+                  url,
+                  statusCode: status,
+                  sessionId: sid,
+                  tabId: tid,
+                  nextStep:
+                    "Use sessionId and tabId with puppeteer_get_content, puppeteer_click, puppeteer_screenshot, etc.",
+                }),
+              },
+            ],
+          };
         }
 
-        const status = response.status();
-        if (failOn4xx && status >= 400) {
-          throw new Error(`HTTP error: ${status} ${response.statusText()}`);
-        }
-
+        // openTab already navigated to url
         return {
           content: [
             {
               type: "text" as const,
-              text: `Successfully navigated to ${url} (Status: ${status})`,
+              text: JSON.stringify({
+                status: "success",
+                url,
+                sessionId: sid,
+                tabId: tid,
+                nextStep: isNewSession
+                  ? "Use sessionId and tabId with puppeteer_get_content, puppeteer_click, puppeteer_screenshot, etc."
+                  : "Use sessionId and tabId for subsequent operations.",
+              }),
             },
           ],
         };
@@ -64,7 +103,12 @@ export default (server: McpServer) => {
           content: [
             {
               type: "text" as const,
-              text: `Navigation failed: ${message}`,
+              text: JSON.stringify({
+                status: "error",
+                error: message,
+                action: "navigate",
+                nextStep: "Retry with a valid URL or check browser is running.",
+              }),
             },
           ],
           isError: true,

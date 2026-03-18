@@ -3,18 +3,18 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { Hono } from "hono";
 import { streamSSE } from "hono/streaming";
 import {
+  puppeteerActiveTabs,
   puppeteerClick,
+  puppeteerClose,
   puppeteerCloseTab,
-  puppeteerConnectActiveTab,
   puppeteerEvaluate,
   puppeteerFill,
   puppeteerGetContent,
   puppeteerHover,
   puppeteerNavigate,
-  puppeteerOpenTab,
   puppeteerScreenshot,
   puppeteerSelect,
-} from "./tools/index";
+} from "./tools";
 
 const app = new Hono();
 
@@ -23,9 +23,9 @@ function createMcpServer() {
     name: "mcp-streamable-puppeteer",
     version: "1.0.0",
   });
-  puppeteerConnectActiveTab(server);
-  puppeteerOpenTab(server);
+  puppeteerActiveTabs(server);
   puppeteerCloseTab(server);
+  puppeteerClose(server);
   puppeteerGetContent(server);
   puppeteerNavigate(server);
   puppeteerScreenshot(server);
@@ -37,7 +37,20 @@ function createMcpServer() {
   return server;
 }
 
-app.get("/health", (c) => c.json({ status: "ok" }));
+app.get("/health", async (c) => {
+  try {
+    const controller = new AbortController();
+    const t = setTimeout(() => controller.abort(), 3000);
+    const res = await fetch(`http://localhost:9222/json/version`, {
+      signal: controller.signal,
+    });
+    clearTimeout(t);
+    if (!res.ok) throw new Error(`Browser unreachable: ${res.status} ${res.statusText}`);
+  } catch (error) {
+    return c.json({ status: "degraded", browser: "unreachable" }, 503);
+  }
+  return c.json({ status: "ok", browser: "connected" });
+});
 
 // Streamable HTTP, JSON-only (matches Python json_response=True) - no SSE for MCP protocol.
 // LM Studio's client always tries GET first and treats 405/400 as fatal, so we return 200 with

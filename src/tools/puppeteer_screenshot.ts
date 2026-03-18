@@ -12,12 +12,12 @@ export default (server: McpServer) => {
         sessionId: z
           .string()
           .describe(
-            "Session identifier returned by puppeteer_connect_active_tab",
+            "Session identifier returned by puppeteer_navigate or puppeteer_active_tabs",
           ),
         tabId: z
           .string()
           .describe(
-            "Tab identifier returned by puppeteer_connect_active_tab or puppeteer_open_tab",
+            "Tab identifier returned by puppeteer_navigate or puppeteer_active_tabs",
           ),
         name: z.string().describe("Name for the screenshot"),
         selector: z
@@ -54,7 +54,11 @@ export default (server: McpServer) => {
                 content: [
                   {
                     type: "text" as const,
-                    text: `Element not found: ${selector}`,
+                    text: JSON.stringify({
+                      status: "error",
+                      error: `Element not found: ${selector}`,
+                      action: "screenshot",
+                    }),
                   },
                 ],
                 isError: true,
@@ -74,7 +78,15 @@ export default (server: McpServer) => {
             content: [
               {
                 type: "text" as const,
-                text: `Screenshot '${name}' taken at ${vw}x${vh}`,
+                text: JSON.stringify({
+                  status: "success",
+                  name,
+                  dimensions: `${vw}x${vh}`,
+                  selector: selector ?? null,
+                  hasImage: true,
+                  nextStep:
+                    "Image attached. Use puppeteer_get_content or puppeteer_click for further interaction.",
+                }),
               },
               {
                 type: "image" as const,
@@ -94,7 +106,11 @@ export default (server: McpServer) => {
           content: [
             {
               type: "text" as const,
-              text: `Screenshot failed: ${message}`,
+              text: JSON.stringify({
+                status: "error",
+                error: message,
+                action: "screenshot",
+              }),
             },
           ],
           isError: true,

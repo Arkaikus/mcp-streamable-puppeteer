@@ -11,12 +11,12 @@ export default (server: McpServer) => {
         sessionId: z
           .string()
           .describe(
-            "Session identifier returned by puppeteer_connect_active_tab",
+            "Session identifier returned by puppeteer_navigate or puppeteer_active_tabs",
           ),
         tabId: z
           .string()
           .describe(
-            "Tab identifier returned by puppeteer_connect_active_tab or puppeteer_open_tab",
+            "Tab identifier returned by puppeteer_navigate or puppeteer_active_tabs",
           ),
         selector: z
           .string()
@@ -36,7 +36,15 @@ export default (server: McpServer) => {
           content: [
             {
               type: "text" as const,
-              text: `Hovered ${selector}`,
+              text: JSON.stringify({
+                status: "success",
+                action: "hovered",
+                selector,
+                sessionId,
+                tabId,
+                nextStep:
+                  "Use puppeteer_click to click the hovered element, or puppeteer_get_content to inspect.",
+              }),
             },
           ],
         };
@@ -46,7 +54,12 @@ export default (server: McpServer) => {
           content: [
             {
               type: "text" as const,
-              text: `Failed to hover ${selector}: ${message}`,
+              text: JSON.stringify({
+                status: "error",
+                error: message,
+                action: "hover",
+                selector,
+              }),
             },
           ],
           isError: true,

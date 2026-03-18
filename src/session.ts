@@ -56,6 +56,9 @@ async function ensureBrowserConnection(
   );
 }
 
+const DEFAULT_HOST = "localhost";
+const DEFAULT_PORT = 9222;
+
 /**
  * Connect a session to the browser. If the session already exists and the
  * browser is still connected it is reused. Returns the sessionId and a list
@@ -63,8 +66,8 @@ async function ensureBrowserConnection(
  */
 export async function connectSession(
   sessionId: string,
-  host: string = Bun.env.BROWSER_DEBUG_HOST ?? "localhost",
-  port: number = Number(Bun.env.BROWSER_DEBUG_PORT ?? 9222),
+  host: string = DEFAULT_HOST,
+  port: number = DEFAULT_PORT,
 ): Promise<{
   sessionId: string;
   tabs: { tabId: string; url: string; title: string }[];
@@ -111,7 +114,7 @@ export async function getPage(sessionId: string, tabId: string): Promise<Page> {
   const session = sessions.get(sessionId);
   if (!session) {
     throw new Error(
-      `Session '${sessionId}' not found. Call puppeteer_connect_active_tab first.`,
+      `Session '${sessionId}' not found. Call puppeteer_navigate or puppeteer_active_tabs first.`,
     );
   }
   const page = session.tabs.get(tabId);
@@ -133,7 +136,7 @@ export async function openTab(
   const session = sessions.get(sessionId);
   if (!session) {
     throw new Error(
-      `Session '${sessionId}' not found. Call puppeteer_connect_active_tab first.`,
+      `Session '${sessionId}' not found. Call puppeteer_navigate or puppeteer_active_tabs first.`,
     );
   }
   const page = await session.browser.newPage();
@@ -163,4 +166,14 @@ export async function closeTab(
   }
   await page.close();
   session.tabs.delete(tabId);
+}
+
+/** Close a session (disconnect from browser). */
+export async function closeSession(sessionId: string): Promise<void> {
+  const session = sessions.get(sessionId);
+  if (!session) {
+    throw new Error(`Session '${sessionId}' not found.`);
+  }
+  session.browser.disconnect();
+  sessions.delete(sessionId);
 }

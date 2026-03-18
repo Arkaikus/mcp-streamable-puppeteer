@@ -13,12 +13,12 @@ export default (server: McpServer) => {
         sessionId: z
           .string()
           .describe(
-            "Session identifier returned by puppeteer_connect_active_tab",
+            "Session identifier returned by puppeteer_navigate or puppeteer_active_tabs",
           ),
         tabId: z
           .string()
           .describe(
-            "Tab identifier returned by puppeteer_connect_active_tab or puppeteer_open_tab",
+            "Tab identifier returned by puppeteer_navigate or puppeteer_active_tabs",
           ),
         selector: z
           .string()
@@ -46,7 +46,13 @@ export default (server: McpServer) => {
           content: [
             {
               type: "text" as const,
-              text: html,
+              text: JSON.stringify({
+                status: "success",
+                html,
+                selector: selector ?? null,
+                nextStep:
+                  "Use puppeteer_click, puppeteer_fill, puppeteer_select, or puppeteer_screenshot for further interaction.",
+              }),
             },
           ],
         };
@@ -56,7 +62,11 @@ export default (server: McpServer) => {
           content: [
             {
               type: "text" as const,
-              text: `Failed to get page content: ${message}`,
+              text: JSON.stringify({
+                status: "error",
+                error: message,
+                action: "get_content",
+              }),
             },
           ],
           isError: true,

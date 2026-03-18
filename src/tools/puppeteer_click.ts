@@ -11,12 +11,12 @@ export default (server: McpServer) => {
         sessionId: z
           .string()
           .describe(
-            "Session identifier returned by puppeteer_connect_active_tab",
+            "Session identifier returned by puppeteer_navigate or puppeteer_active_tabs",
           ),
         tabId: z
           .string()
           .describe(
-            "Tab identifier returned by puppeteer_connect_active_tab or puppeteer_open_tab",
+            "Tab identifier returned by puppeteer_navigate or puppeteer_active_tabs",
           ),
         selector: z.string().describe("CSS selector of the element to click"),
         timeout: z
@@ -34,7 +34,15 @@ export default (server: McpServer) => {
           content: [
             {
               type: "text" as const,
-              text: `Clicked: ${selector}`,
+              text: JSON.stringify({
+                status: "success",
+                action: "clicked",
+                selector,
+                sessionId,
+                tabId,
+                nextStep:
+                  "Use puppeteer_get_content to verify, or puppeteer_fill, puppeteer_screenshot for more actions.",
+              }),
             },
           ],
         };
@@ -44,7 +52,12 @@ export default (server: McpServer) => {
           content: [
             {
               type: "text" as const,
-              text: `Failed to click ${selector}: ${message}`,
+              text: JSON.stringify({
+                status: "error",
+                error: message,
+                action: "click",
+                selector,
+              }),
             },
           ],
           isError: true,

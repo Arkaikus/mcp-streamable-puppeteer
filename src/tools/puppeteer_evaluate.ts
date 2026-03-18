@@ -13,12 +13,12 @@ export default (server: McpServer) => {
         sessionId: z
           .string()
           .describe(
-            "Session identifier returned by puppeteer_connect_active_tab",
+            "Session identifier returned by puppeteer_navigate or puppeteer_active_tabs",
           ),
         tabId: z
           .string()
           .describe(
-            "Tab identifier returned by puppeteer_connect_active_tab or puppeteer_open_tab",
+            "Tab identifier returned by puppeteer_navigate or puppeteer_active_tabs",
           ),
         script: z
           .string()
@@ -48,7 +48,13 @@ export default (server: McpServer) => {
             content: [
               {
                 type: "text" as const,
-                text: `Execution result:\n${JSON.stringify(result, null, 2)}\n\nConsole output:\n${logs.join("\n")}`,
+                text: JSON.stringify({
+                  status: "success",
+                  result,
+                  consoleOutput: logs.length > 0 ? logs : undefined,
+                  nextStep:
+                    "Use puppeteer_click, puppeteer_fill, or puppeteer_get_content for further interaction.",
+                }),
               },
             ],
           };
@@ -61,7 +67,11 @@ export default (server: McpServer) => {
           content: [
             {
               type: "text" as const,
-              text: `Script execution failed: ${message}`,
+              text: JSON.stringify({
+                status: "error",
+                error: message,
+                action: "evaluate",
+              }),
             },
           ],
           isError: true,

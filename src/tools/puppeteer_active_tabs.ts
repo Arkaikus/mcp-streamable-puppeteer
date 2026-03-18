@@ -4,7 +4,7 @@ import { connectSession } from "../session";
 
 export default (server: McpServer) => {
   server.registerTool(
-    "puppeteer_connect_active_tab",
+    "puppeteer_active_tabs",
     {
       description:
         "Connect to the browser (headless-shell or any CDP-compatible browser). " +
@@ -18,18 +18,6 @@ export default (server: McpServer) => {
             "Session identifier (reuses an existing connection when provided). " +
               "If omitted a new UUID is generated.",
           ),
-        debugHost: z
-          .string()
-          .optional()
-          .describe(
-            "Remote debugging host (default: BROWSER_DEBUG_HOST env or localhost)",
-          ),
-        debugPort: z
-          .number()
-          .optional()
-          .describe(
-            "Remote debugging port (default: BROWSER_DEBUG_PORT env or 9222)",
-          ),
         targetUrl: z
           .string()
           .optional()
@@ -39,28 +27,30 @@ export default (server: McpServer) => {
           ),
       }),
     },
-    async ({ sessionId, debugHost, debugPort, targetUrl }) => {
+    async ({ sessionId, targetUrl }) => {
       try {
-        const sid = sessionId ?? crypto.randomUUID(); // crypto guaranteed by Bun runtime
-        const host = debugHost ?? Bun.env.BROWSER_DEBUG_HOST ?? "localhost";
-        const port = debugPort ?? Number(Bun.env.BROWSER_DEBUG_PORT ?? 9222);
-
-        const { tabs } = await connectSession(sid, host, port);
+        const sid = sessionId ?? crypto.randomUUID();
+        const { tabs } = await connectSession(sid);
         const filtered = targetUrl
           ? tabs.filter((t) => t.url.includes(targetUrl))
           : tabs;
-
-        const tabLines = filtered
-          .map((t) => `  • tabId=${t.tabId}  ${t.title} (${t.url})`)
-          .join("\n");
 
         return {
           content: [
             {
               type: "text" as const,
-              text:
-                `Connected. sessionId=${sid}\n` +
-                `Open tabs (${filtered.length}):\n${tabLines || "  (none)"}`,
+              text: JSON.stringify({
+                status: "success",
+                sessionId: sid,
+                tabs: filtered.map((t) => ({
+                  tabId: t.tabId,
+                  title: t.title,
+                  url: t.url,
+                })),
+                tabCount: filtered.length,
+                nextStep:
+                  "Use sessionId and tabId with puppeteer_navigate, puppeteer_get_content, puppeteer_click, etc.",
+              }),
             },
           ],
         };
@@ -70,7 +60,12 @@ export default (server: McpServer) => {
           content: [
             {
               type: "text" as const,
-              text: `Failed to connect to browser: ${message}\n\nEnsure the browser container (headless-shell or brave) is running with remote debugging on port 9222.`,
+              text: JSON.stringify({
+                status: "error",
+                error: message,
+                nextStep:
+                  "Ensure the browser container (headless-shell or brave) is running with remote debugging on port 9222.",
+              }),
             },
           ],
           isError: true,

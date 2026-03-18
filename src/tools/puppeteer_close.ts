@@ -1,39 +1,33 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { closeTab } from "../session";
+import { closeSession } from "../session";
 
 export default (server: McpServer) => {
   server.registerTool(
-    "puppeteer_close_tab",
+    "puppeteer_close",
     {
-      description: "Close a specific browser tab in the given session.",
+      description:
+        "Close a browser session. Disconnects from the browser and frees resources.",
       inputSchema: z.object({
         sessionId: z
           .string()
           .describe(
-            "Session identifier returned by puppeteer_navigate or puppeteer_active_tabs",
-          ),
-        tabId: z
-          .string()
-          .describe(
-            "Tab identifier returned by puppeteer_navigate or puppeteer_active_tabs",
+            "Session identifier to close (returned by puppeteer_navigate or puppeteer_active_tabs)",
           ),
       }),
     },
-    async ({ sessionId, tabId }) => {
+    async ({ sessionId }) => {
       try {
-        await closeTab(sessionId, tabId);
+        await closeSession(sessionId);
         return {
           content: [
             {
               type: "text" as const,
               text: JSON.stringify({
                 status: "success",
-                action: "closed_tab",
+                action: "closed_session",
                 sessionId,
-                tabId,
-                nextStep:
-                  "Use puppeteer_close to end the session, or continue with other tabs.",
+                nextStep: "Call puppeteer_navigate to start a new session.",
               }),
             },
           ],
@@ -47,7 +41,7 @@ export default (server: McpServer) => {
               text: JSON.stringify({
                 status: "error",
                 error: message,
-                action: "close_tab",
+                action: "close_session",
               }),
             },
           ],

@@ -13,12 +13,12 @@ export default (server: McpServer) => {
         sessionId: z
           .string()
           .describe(
-            "Session identifier returned by puppeteer_connect_active_tab",
+            "Session identifier returned by puppeteer_navigate or puppeteer_active_tabs",
           ),
         tabId: z
           .string()
           .describe(
-            "Tab identifier returned by puppeteer_connect_active_tab or puppeteer_open_tab",
+            "Tab identifier returned by puppeteer_navigate or puppeteer_active_tabs",
           ),
         selector: z.string().describe("CSS selector of the input element"),
         value: z.string().describe("Value to type into the element"),
@@ -60,7 +60,16 @@ export default (server: McpServer) => {
           content: [
             {
               type: "text" as const,
-              text: `Filled ${selector} with: ${value}`,
+              text: JSON.stringify({
+                status: "success",
+                action: "filled",
+                selector,
+                value,
+                sessionId,
+                tabId,
+                nextStep:
+                  "Use puppeteer_click to submit, or puppeteer_get_content to verify.",
+              }),
             },
           ],
         };
@@ -70,7 +79,12 @@ export default (server: McpServer) => {
           content: [
             {
               type: "text" as const,
-              text: `Failed to fill ${selector}: ${message}`,
+              text: JSON.stringify({
+                status: "error",
+                error: message,
+                action: "fill",
+                selector,
+              }),
             },
           ],
           isError: true,
