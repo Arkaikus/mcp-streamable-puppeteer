@@ -110,7 +110,7 @@ async function runSmokeTest() {
   // Pre-check: verify MCP server can connect to browser (more reliable than raw fetch)
   console.log("\n📡 Verifying MCP server can connect to browser...");
   const connectResult = await mcpClient.callTool({
-    name: "puppeteer_connect_active_tab",
+    name: "puppeteer_active_tabs",
     arguments: {},
   });
   if (connectResult.isError) {
@@ -119,9 +119,6 @@ async function runSmokeTest() {
     console.error("❌ MCP server cannot connect to browser.");
     console.error(`   ${errText.substring(0, 200)}...`);
     console.error("   Ensure: docker compose up headless-shell -d");
-    console.error(
-      "   If MCP runs in Docker, set BROWSER_DEBUG_HOST=host.docker.internal",
-    );
     await mcpClient.close();
     process.exit(1);
   }
@@ -130,8 +127,13 @@ async function runSmokeTest() {
   // Extract sessionId from pre-check (LLM can skip connect step)
   const connectText =
     connectResult.content.find((c) => c.type === "text")?.text ?? "";
-  const sessionMatch = connectText.match(/sessionId=([a-f0-9-]+)/);
-  const preCheckSessionId = sessionMatch?.[1];
+  let preCheckSessionId: string | undefined;
+  try {
+    const parsed = JSON.parse(connectText) as { sessionId?: string };
+    preCheckSessionId = parsed.sessionId;
+  } catch {
+    preCheckSessionId = connectText.match(/sessionId=([a-f0-9-]+)/)?.[1];
+  }
 
   // Get available tools from MCP
   const { tools } = await mcpClient.listTools();
@@ -150,7 +152,7 @@ async function runSmokeTest() {
     : "";
 
   const testTask = `You are a browser automation assistant. ${sessionHint}Do these steps:
-1. Call puppeteer_open_tab with sessionId and url: "${dataUrl}"
+1. Call puppeteer_navigate with url: "${dataUrl}"
 2. Call puppeteer_click with sessionId, tabId, selector: "#btn"
 3. Call puppeteer_evaluate with sessionId, tabId, script: "return document.getElementById('out').textContent" to verify it says "ok"
 4. Call puppeteer_close_tab with sessionId and tabId
@@ -226,19 +228,24 @@ Use sessionId and tabId from tool responses. When done, reply with a brief summa
           }
 
           // Extract sessionId and tabId from responses
-          if (toolName === "puppeteer_connect_active_tab") {
-            const textContent = result.content.find((c) => c.type === "text");
-            const match = textContent?.text?.match(/sessionId=([a-f0-9-]+)/);
-            if (match) {
-              sessionId = match[1];
-              console.log(`      ✅ Got sessionId: ${sessionId}`);
-            }
-          } else if (toolName === "puppeteer_open_tab") {
-            const textContent = result.content.find((c) => c.type === "text");
-            const match = textContent?.text?.match(/tabId=([a-f0-9-]+)/);
-            if (match) {
-              tabId = match[1];
-              console.log(`      ✅ Got tabId: ${tabId}`);
+          const textContent = result.content.find((c) => c.type === "text");
+          const text = textContent?.text ?? "";
+          if (toolName === "puppeteer_active_tabs" || toolName === "puppeteer_navigate") {
+            try {
+              const parsed = JSON.parse(text) as { sessionId?: string; tabId?: string };
+              if (parsed.sessionId) {
+                sessionId = parsed.sessionId;
+                console.log(`      ✅ Got sessionId: ${sessionId}`);
+              }
+              if (parsed.tabId) {
+                tabId = parsed.tabId;
+                console.log(`      ✅ Got tabId: ${tabId}`);
+              }
+            } catch {
+              const sidMatch = text.match(/sessionId=([a-f0-9-]+)/);
+              const tabMatch = text.match(/tabId=([a-f0-9-]+)/);
+              if (sidMatch) sessionId = sidMatch[1];
+              if (tabMatch) tabId = tabMatch[1];
             }
           }
 

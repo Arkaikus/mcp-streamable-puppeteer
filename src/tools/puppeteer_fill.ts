@@ -54,6 +54,8 @@ export default (server: McpServer) => {
             value,
           );
         } else {
+          await page.click(selector, { clickCount: 3 });
+          await page.keyboard.press("Backspace");
           await page.type(selector, value);
         }
         return {

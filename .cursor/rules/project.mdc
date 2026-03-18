@@ -1,0 +1,11 @@
+---
+description: Project-wide conventions
+alwaysApply: true
+---
+
+# mcp-streamable-puppeteer
+
+- **Runtime:** Bun (no Node/npm)
+- **Stack:** Hono, MCP SDK, puppeteer-core, zod
+- **Browser:** CDP at localhost:9222 (docker-compose shares network)
+- **Tests:** `bun test tests/` — require headless-shell; skip when unreachable

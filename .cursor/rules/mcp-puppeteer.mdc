@@ -1,0 +1,25 @@
+---
+description: MCP Puppeteer tool and response conventions
+globs: src/tools/**/*.ts
+alwaysApply: false
+---
+
+# MCP Puppeteer Tools
+
+## Tool responses
+
+- Return JSON via `JSON.stringify()` in `content[0].text`
+- Success: `{ status: "success", ...fields, nextStep }`
+- Error: `{ status: "error", error: string, action?: string }`
+- Include `sessionId` and `tabId` when relevant for chaining
+
+## Session flow
+
+- `puppeteer_navigate` is the entrypoint; omit sessionId/tabId to create new session+tab
+- `puppeteer_close` to end session
+- `puppeteer_close_tab` for individual tabs
+
+## Session module
+
+- Use `connectSession`, `getPage`, `openTab`, `closeTab`, `closeSession` from `../session`
+- No host/port params — always localhost:9222

@@ -28,6 +28,7 @@ services:
     container_name: mcp-streamable-puppeteer
     ports:
       - "8000:8000"
+      - "9222:9222"
     restart: unless-stopped
   headless-shell:
     image: chromedp/headless-shell:latest

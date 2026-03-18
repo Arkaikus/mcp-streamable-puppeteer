@@ -7,21 +7,20 @@
  *
  * Then:  bun test tests/
  *
- * Uses CDP_HOST and CDP_PORT (default localhost:9223) to target headless-shell.
+ * Uses localhost:9222 (MCP shares network with headless-shell in docker-compose).
  * Tests are skipped when the browser is not reachable.
  */
 
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { closeTab, connectSession, getPage, openTab } from "../src/session";
 
-const HOST = process.env.CDP_HOST ?? "localhost";
-const PORT = Number(process.env.CDP_PORT ?? 9222);
+const BROWSER_URL = "http://localhost:9222/json/version";
 
 async function isBrowserReachable(): Promise<boolean> {
   try {
     const controller = new AbortController();
     const t = setTimeout(() => controller.abort(), 2000);
-    const res = await fetch(`http://${HOST}:${PORT}/json/version`, {
+    const res = await fetch(BROWSER_URL, {
       signal: controller.signal,
     });
     clearTimeout(t);
@@ -34,7 +33,7 @@ async function isBrowserReachable(): Promise<boolean> {
 const BROWSER_REACHABLE = await isBrowserReachable();
 if (!BROWSER_REACHABLE) {
   console.warn(
-    `Skipping Puppeteer CDP integration tests: browser not reachable at ${HOST}:${PORT}. Run \`docker compose up headless-shell -d\` and ensure the debug port is accessible.`,
+    `Skipping Puppeteer CDP integration tests: browser not reachable at localhost:9222. Run \`docker compose up headless-shell -d\` and ensure the debug port is accessible.`,
   );
 }
 
@@ -65,7 +64,7 @@ describe.skipIf(!BROWSER_REACHABLE)(
   "Puppeteer ↔ chromedp/headless-shell (CDP)",
   () => {
     beforeAll(async () => {
-      const result = await connectSession(crypto.randomUUID(), HOST, PORT);
+      const result = await connectSession(crypto.randomUUID());
       sessionId = result.sessionId;
 
       const { tabId: newTabId } = await openTab(

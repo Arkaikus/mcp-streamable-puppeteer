@@ -1,23 +1,20 @@
-# MCP Streamable Puppeteer Server
+# MCP Streamable Puppeteer
 
-An MCP server using Streamable HTTP transport that provides Puppeteer browser automation. Connects to a Brave browser (or any Chrome DevTools Protocol–compatible browser) and exposes tools for navigation, screenshots, clicks, form filling, and more. Built with **Bun** (no Node, no npm).
+MCP server using Streamable HTTP transport for Puppeteer browser automation. Connects to any Chrome DevTools Protocol–compatible browser (chromedp/headless-shell, Brave, etc.) and exposes tools for navigation, screenshots, clicks, form filling, and more. Built with **Bun**.
 
-## Running with Docker Compose
-
-The stack includes Brave (with remote debugging) and the MCP server:
+## Quick Start
 
 ```bash
-docker compose up --build
+docker compose up headless-shell -d   # Start browser
+bun run dev                           # Start MCP server
 ```
 
-## Verify
-
-- **Health check:** http://localhost:8000/health
+- **Health:** http://localhost:8000/health  
 - **MCP endpoint:** http://localhost:8000/mcp (Streamable HTTP)
 
-## LM Studio Configuration
+## LM Studio
 
-Open LM Studio → **Program tab** → **Install** → **Edit mcp.json** and add:
+Add to `mcp.json`:
 
 ```json
 {
@@ -29,33 +26,64 @@ Open LM Studio → **Program tab** → **Install** → **Edit mcp.json** and add
 }
 ```
 
-After saving, your model will have access to the Puppeteer tools.
-
-## Available Tools
+## Tools
 
 | Tool | Description |
 |------|-------------|
-| `puppeteer_connect_active_tab` | Connect to the browser. Returns sessionId and list of open tabs with tabIds. Call this first. |
-| `puppeteer_open_tab` | Open a new tab, optionally navigating to a URL. |
-| `puppeteer_close_tab` | Close a specific tab. |
-| `puppeteer_navigate` | Navigate a tab to a URL. |
-| `puppeteer_get_content` | Get HTML content of a tab (full page or a selected element). |
-| `puppeteer_screenshot` | Take a screenshot of a tab or element. |
-| `puppeteer_click` | Click an element by CSS selector. |
-| `puppeteer_fill` | Fill an input field (supports `fast` mode for direct value assignment). |
-| `puppeteer_select` | Select an option in a `<select>` element. |
-| `puppeteer_hover` | Hover over an element. |
-| `puppeteer_evaluate` | Execute JavaScript in the tab context and return the result. |
+| `puppeteer_navigate` | **Entrypoint.** Navigate to URL. Omit sessionId/tabId to create session + tab. Returns JSON with `sessionId`, `tabId`. |
+| `puppeteer_active_tabs` | Connect to browser, list open tabs with `sessionId` and `tabId`s. |
+| `puppeteer_close_tab` | Close a tab. |
+| `puppeteer_close` | Close session (disconnect). |
+| `puppeteer_get_content` | Get HTML (full page or selector). Returns `{ html, selector?, nextStep }`. |
+| `puppeteer_screenshot` | Screenshot tab or element. Returns metadata + base64 image. |
+| `puppeteer_click` | Click element by CSS selector. |
+| `puppeteer_fill` | Fill input (use `fast: true` for direct value). |
+| `puppeteer_select` | Select option in `<select>`. |
+| `puppeteer_hover` | Hover over element. |
+| `puppeteer_evaluate` | Run JavaScript in tab, return `{ result, consoleOutput? }`. |
 
-Use `sessionId` and `tabId` from `puppeteer_connect_active_tab` with all other tools.
+**Flow:** `puppeteer_navigate` → use `sessionId`/`tabId` with other tools → `puppeteer_close`.
 
-## Local Development (with Bun)
+All tools return structured JSON (`status`, `nextStep`, `sessionId`/`tabId` where relevant) for LLM parsing.
 
-With a browser running with remote debugging (e.g. Brave with `--remote-debugging-port=9222`):
+## CLI
+
+Direct tool calls without an LLM:
+
+```bash
+bun scripts/cli.ts get-content https://example.com
+bun scripts/cli.ts get-content https://example.com --selector "#main"
+bun scripts/cli.ts screenshot https://example.com -o out.png
+bun scripts/cli.ts eval https://example.com "return document.title"
+```
+
+Requires `docker compose up headless-shell -d` and `bun run dev`. See [scripts/README.md](scripts/README.md).
+
+## Docker Compose
+
+- **headless-shell** + **mcp-streamable-puppeteer**: MCP shares network with headless-shell via `network_mode: service:mcp-streamable-puppeteer`; browser at localhost:9222.
+- **brave** (profile): `docker compose --profile brave up`
+
+```bash
+docker compose up --build
+```
+
+## Local Development
 
 ```bash
 bun install
 bun run dev
 ```
 
-Set `BROWSER_DEBUG_HOST` and `BROWSER_DEBUG_PORT` if the browser is not on localhost:9222.
+Connects to localhost:9222. Run a CDP browser (e.g. Brave with `--remote-debugging-port=9222`) or use Docker.
+
+## Tests
+
+```bash
+docker compose up headless-shell -d
+bun test tests/
+```
+
+- `puppeteer-cdp.test.ts`, `puppeteer-brave.test.ts` — session layer (skip if browser unreachable)
+- `mcp-integration.test.ts` — full MCP protocol
+- `e2e-smoke.ts` — optional LLM-driven smoke (`bun run test:smoke`)

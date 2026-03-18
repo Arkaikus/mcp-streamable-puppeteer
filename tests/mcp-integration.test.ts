@@ -19,14 +19,13 @@ import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 
-const HOST = process.env.CDP_HOST ?? "localhost";
-const PORT = Number(process.env.CDP_PORT ?? 9222);
+const BROWSER_URL = "http://localhost:9222/json/version";
 
 async function isBrowserReachable(): Promise<boolean> {
   try {
     const controller = new AbortController();
     const t = setTimeout(() => controller.abort(), 2000);
-    const res = await fetch(`http://${HOST}:${PORT}/json/version`, {
+    const res = await fetch(BROWSER_URL, {
       signal: controller.signal,
     });
     clearTimeout(t);
@@ -39,7 +38,7 @@ async function isBrowserReachable(): Promise<boolean> {
 const BROWSER_REACHABLE = await isBrowserReachable();
 if (!BROWSER_REACHABLE) {
   console.warn(
-    `Skipping MCP integration tests: browser not reachable at ${HOST}:${PORT}. Run \`docker compose up headless-shell -d\` and ensure the debug port is accessible.`,
+    `Skipping MCP integration tests: browser not reachable at localhost:9222. Run \`docker compose up headless-shell -d\` and ensure the debug port is accessible.`,
   );
 }
 
@@ -103,15 +102,15 @@ describe.skipIf(!BROWSER_REACHABLE)("MCP Protocol Integration", () => {
   afterAll(async () => {
     if (!setupComplete) return;
 
-    // Clean up: close tab if it exists
-    if (sessionId && tabId) {
+    // Clean up: close session if it exists
+    if (sessionId) {
       try {
         await mcpClient.callTool({
-          name: "puppeteer_close_tab",
-          arguments: { sessionId, tabId },
+          name: "puppeteer_close",
+          arguments: { sessionId },
         });
       } catch {
-        // Tab may already be closed
+        // Session may already be closed
       }
     }
 
@@ -130,9 +129,9 @@ describe.skipIf(!BROWSER_REACHABLE)("MCP Protocol Integration", () => {
     expect(tools.length).toBeGreaterThan(0);
 
     const toolNames = tools.map((t) => t.name);
-    expect(toolNames).toContain("puppeteer_connect_active_tab");
-    expect(toolNames).toContain("puppeteer_open_tab");
+    expect(toolNames).toContain("puppeteer_active_tabs");
     expect(toolNames).toContain("puppeteer_close_tab");
+    expect(toolNames).toContain("puppeteer_close");
     expect(toolNames).toContain("puppeteer_navigate");
     expect(toolNames).toContain("puppeteer_get_content");
     expect(toolNames).toContain("puppeteer_screenshot");
@@ -158,33 +157,10 @@ describe.skipIf(!BROWSER_REACHABLE)("MCP Protocol Integration", () => {
     }
   });
 
-  test("connects to browser and gets session", async () => {
+  test("navigate as main entrypoint creates session and tab", async () => {
     const result = await mcpClient.callTool({
-      name: "puppeteer_connect_active_tab",
-      arguments: {},
-    });
-
-    expect(result.isError).toBeFalsy();
-    expect(result.content).toBeDefined();
-    expect(Array.isArray(result.content)).toBe(true);
-    expect(result.content.length).toBeGreaterThan(0);
-
-    const textContent = result.content.find((c) => c.type === "text");
-    expect(textContent).toBeDefined();
-    expect(textContent?.text).toContain("Connected. sessionId=");
-
-    // Extract sessionId from response
-    const match = textContent?.text.match(/sessionId=([a-f0-9-]+)/);
-    expect(match).toBeDefined();
-    sessionId = match?.[1] ?? "";
-    expect(sessionId).toBeDefined();
-  });
-
-  test("opens a new tab with data URL", async () => {
-    const result = await mcpClient.callTool({
-      name: "puppeteer_open_tab",
+      name: "puppeteer_navigate",
       arguments: {
-        sessionId,
         url: TEST_PAGE_DATA_URL,
       },
     });
@@ -193,13 +169,14 @@ describe.skipIf(!BROWSER_REACHABLE)("MCP Protocol Integration", () => {
     expect(result.content).toBeDefined();
 
     const textContent = result.content.find((c) => c.type === "text");
-    expect(textContent?.text).toContain("Opened new tab");
-    expect(textContent?.text).toContain("tabId=");
-
-    // Extract tabId from response
-    const match = textContent?.text.match(/tabId=([a-f0-9-]+)/);
-    expect(match).toBeDefined();
-    tabId = match?.[1] ?? "";
+    expect(textContent).toBeDefined();
+    const parsed = JSON.parse(textContent!.text!);
+    expect(parsed.status).toBe("success");
+    expect(parsed.sessionId).toBeDefined();
+    expect(parsed.tabId).toBeDefined();
+    sessionId = parsed.sessionId;
+    tabId = parsed.tabId;
+    expect(sessionId).toBeDefined();
     expect(tabId).toBeDefined();
   });
 
@@ -213,9 +190,11 @@ describe.skipIf(!BROWSER_REACHABLE)("MCP Protocol Integration", () => {
     });
 
     expect(result.isError).toBeFalsy();
-    const textContent = result.content.find((c) => c.type === "text");
-    expect(textContent?.text).toContain("Hello MCP");
-    expect(textContent?.text).toContain('id="heading"');
+    const parsed = JSON.parse(
+      result.content.find((c) => c.type === "text")!.text!,
+    ) as { html: string };
+    expect(parsed.html).toContain("Hello MCP");
+    expect(parsed.html).toContain('id="heading"');
   });
 
   test("gets element content with selector", async () => {
@@ -229,8 +208,10 @@ describe.skipIf(!BROWSER_REACHABLE)("MCP Protocol Integration", () => {
     });
 
     expect(result.isError).toBeFalsy();
-    const textContent = result.content.find((c) => c.type === "text");
-    expect(textContent?.text).toContain("Hello MCP");
+    const parsed = JSON.parse(
+      result.content.find((c) => c.type === "text")!.text!,
+    ) as { html: string };
+    expect(parsed.html).toContain("Hello MCP");
   });
 
   test("takes a screenshot", async () => {
@@ -245,6 +226,10 @@ describe.skipIf(!BROWSER_REACHABLE)("MCP Protocol Integration", () => {
 
     expect(result.isError).toBeFalsy();
     expect(result.content.length).toBeGreaterThan(0);
+    const textParsed = JSON.parse(
+      result.content.find((c) => c.type === "text")!.text!,
+    ) as { status: string };
+    expect(textParsed.status).toBe("success");
 
     const imageContent = result.content.find((c) => c.type === "image");
     expect(imageContent).toBeDefined();
@@ -266,8 +251,10 @@ describe.skipIf(!BROWSER_REACHABLE)("MCP Protocol Integration", () => {
     });
 
     expect(result.isError).toBeFalsy();
-    const textContent = result.content.find((c) => c.type === "text");
-    expect(textContent?.text).toContain("MCP Test");
+    const parsed = JSON.parse(
+      result.content.find((c) => c.type === "text")!.text!,
+    ) as { result: string };
+    expect(parsed.result).toBe("MCP Test");
   });
 
   test("clicks an element", async () => {
@@ -292,8 +279,10 @@ describe.skipIf(!BROWSER_REACHABLE)("MCP Protocol Integration", () => {
       },
     });
 
-    const textContent = evalResult.content.find((c) => c.type === "text");
-    expect(textContent?.text).toContain("clicked");
+    const evalParsed = JSON.parse(
+      evalResult.content.find((c) => c.type === "text")!.text!,
+    ) as { result: string };
+    expect(evalParsed.result).toBe("clicked");
   });
 
   test("fills an input", async () => {
@@ -319,8 +308,10 @@ describe.skipIf(!BROWSER_REACHABLE)("MCP Protocol Integration", () => {
       },
     });
 
-    const textContent = evalResult.content.find((c) => c.type === "text");
-    expect(textContent?.text).toContain("test value");
+    const evalParsed = JSON.parse(
+      evalResult.content.find((c) => c.type === "text")!.text!,
+    ) as { result: string };
+    expect(evalParsed.result).toBe("test value");
   });
 
   test("selects dropdown option", async () => {
@@ -346,8 +337,10 @@ describe.skipIf(!BROWSER_REACHABLE)("MCP Protocol Integration", () => {
       },
     });
 
-    const textContent = evalResult.content.find((c) => c.type === "text");
-    expect(textContent?.text).toContain("opt2");
+    const evalParsed = JSON.parse(
+      evalResult.content.find((c) => c.type === "text")!.text!,
+    ) as { result: string };
+    expect(evalParsed.result).toBe("opt2");
   });
 
   test("hovers over element", async () => {
@@ -361,8 +354,10 @@ describe.skipIf(!BROWSER_REACHABLE)("MCP Protocol Integration", () => {
     });
 
     expect(result.isError).toBeFalsy();
-    const textContent = result.content.find((c) => c.type === "text");
-    expect(textContent?.text).toContain("Hovered");
+    const parsed = JSON.parse(
+      result.content.find((c) => c.type === "text")!.text!,
+    ) as { action: string };
+    expect(parsed.action).toBe("hovered");
   });
 
   test("navigates to a new URL", async () => {
@@ -385,8 +380,10 @@ describe.skipIf(!BROWSER_REACHABLE)("MCP Protocol Integration", () => {
     });
 
     expect(result.isError).toBeFalsy();
-    const textContent = result.content.find((c) => c.type === "text");
-    expect(textContent?.text).toContain("Successfully navigated");
+    const navParsed = JSON.parse(
+      result.content.find((c) => c.type === "text")!.text!,
+    ) as { status: string };
+    expect(navParsed.status).toBe("success");
 
     // Verify navigation worked
     const contentResult = await mcpClient.callTool({
@@ -397,8 +394,10 @@ describe.skipIf(!BROWSER_REACHABLE)("MCP Protocol Integration", () => {
       },
     });
 
-    const content = contentResult.content.find((c) => c.type === "text");
-    expect(content?.text).toContain("New Content");
+    const contentParsed = JSON.parse(
+      contentResult.content.find((c) => c.type === "text")!.text!,
+    ) as { html: string };
+    expect(contentParsed.html).toContain("New Content");
   });
 
   test("handles errors gracefully - invalid session", async () => {
@@ -411,9 +410,11 @@ describe.skipIf(!BROWSER_REACHABLE)("MCP Protocol Integration", () => {
     });
 
     expect(result.isError).toBe(true);
-    const textContent = result.content.find((c) => c.type === "text");
-    expect(textContent?.text).toContain("Session");
-    expect(textContent?.text).toContain("not found");
+    const parsed = JSON.parse(
+      result.content.find((c) => c.type === "text")!.text!,
+    ) as { error: string };
+    expect(parsed.error).toContain("Session");
+    expect(parsed.error).toContain("not found");
   });
 
   test("handles errors gracefully - invalid selector", async () => {
@@ -428,25 +429,29 @@ describe.skipIf(!BROWSER_REACHABLE)("MCP Protocol Integration", () => {
     });
 
     expect(result.isError).toBe(true);
-    const textContent = result.content.find((c) => c.type === "text");
-    expect(textContent?.text.toLowerCase()).toContain("failed");
+    const parsed = JSON.parse(
+      result.content.find((c) => c.type === "text")!.text!,
+    ) as { status: string; error: string };
+    expect(parsed.status).toBe("error");
+    expect(parsed.error).toBeDefined();
   });
 
-  test("closes tab successfully", async () => {
+  test("closes session successfully", async () => {
     const result = await mcpClient.callTool({
-      name: "puppeteer_close_tab",
+      name: "puppeteer_close",
       arguments: {
         sessionId,
-        tabId,
       },
     });
 
     expect(result.isError).toBeFalsy();
-    const textContent = result.content.find((c) => c.type === "text");
-    expect(textContent?.text).toContain("Closed tab");
-    expect(textContent?.text).toContain("tabId=");
+    const parsed = JSON.parse(
+      result.content.find((c) => c.type === "text")!.text!,
+    ) as { action: string };
+    expect(parsed.action).toBe("closed_session");
 
-    // Clear tabId so afterAll doesn't try to close it again
+    // Clear so afterAll doesn't try to close again
+    sessionId = "";
     tabId = "";
   });
 });

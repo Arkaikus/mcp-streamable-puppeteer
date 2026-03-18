@@ -14,14 +14,13 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { closeTab, connectSession, getPage, openTab } from "../src/session";
 
-const HOST = process.env.BROWSER_DEBUG_HOST ?? "localhost";
-const PORT = Number(process.env.BROWSER_DEBUG_PORT ?? 9222);
+const BROWSER_URL = "http://localhost:9222/json/version";
 
 async function isBrowserReachable(): Promise<boolean> {
   try {
     const controller = new AbortController();
     const t = setTimeout(() => controller.abort(), 2000);
-    const res = await fetch(`http://${HOST}:${PORT}/json/version`, {
+    const res = await fetch(BROWSER_URL, {
       signal: controller.signal,
     });
     clearTimeout(t);
@@ -34,7 +33,7 @@ async function isBrowserReachable(): Promise<boolean> {
 const BROWSER_REACHABLE = await isBrowserReachable();
 if (!BROWSER_REACHABLE) {
   console.warn(
-    `Skipping Puppeteer integration tests: browser not reachable at ${HOST}:${PORT}. Run \`docker compose up brave -d\` and ensure the debug port is accessible.`,
+    `Skipping Puppeteer integration tests: browser not reachable at localhost:9222. Run \`docker compose up brave -d\` and ensure the debug port is accessible.`,
   );
 }
 
@@ -63,7 +62,7 @@ let tabId: string;
 
 describe.skipIf(!BROWSER_REACHABLE)("Puppeteer ↔ Brave container", () => {
   beforeAll(async () => {
-    const result = await connectSession(crypto.randomUUID(), HOST, PORT);
+    const result = await connectSession(crypto.randomUUID());
     sessionId = result.sessionId;
 
     const { tabId: newTabId } = await openTab(
